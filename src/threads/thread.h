@@ -6,6 +6,9 @@
 #include <stdint.h>
 #include <threads/synch.h>
 
+static struct lock lock_file;
+
+
 /* States in a thread's life cycle. */
 enum thread_status
   {

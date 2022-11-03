@@ -18,33 +18,26 @@
 # define USER_VADDR_BOUND (void*) 0x08048000
 
 static void (*syscalls[max_syscall])(struct intr_frame *);
-/* Our implementation for Task2: syscall halt,exec,wait and practice */
-void sys_halt(struct intr_frame* f); /* syscall halt. */
-void sys_exit(struct intr_frame* f); /* syscall exit. */
-void sys_exec(struct intr_frame* f); /* syscall exec. */
+
+void sys_halt(struct intr_frame* f); 
+void sys_exit(struct intr_frame* f); 
+void sys_exec(struct intr_frame* f); 
 
 /* Our implementation for Task3: syscall create, remove, open, filesize, read, write, seek, tell, and close */
-// void sys_create(struct intr_frame* f); /* syscall create */
-// void sys_remove(struct intr_frame* f); /* syscall remove */
-// void sys_open(struct intr_frame* f);/* syscall open */
-void sys_wait(struct intr_frame* f); /*syscall wait */
-// void sys_filesize(struct intr_frame* f);/* syscall filesize */
-// void sys_read(struct intr_frame* f);  /* syscall read */
-void sys_write(struct intr_frame* f); /* syscall write */
-// void sys_seek(struct intr_frame* f); /* syscall seek */
-// void sys_tell(struct intr_frame* f); /* syscall tell */
-// void sys_close(struct intr_frame* f); /* syscall close */
+// void sys_create(struct intr_frame* f); 
+// void sys_remove(struct intr_frame* f); 
+// void sys_open(struct intr_frame* f);
+void sys_wait(struct intr_frame* f); 
+// void sys_filesize(struct intr_frame* f);
+// void sys_read(struct intr_frame* f);
+void sys_write(struct intr_frame* f); 
+// void sys_seek(struct intr_frame* f);
+// void sys_tell(struct intr_frame* f);
+// void sys_close(struct intr_frame* f);
 
 static void syscall_handler (struct intr_frame *);
 struct thread_file * find_file_id(int fd);
 
-
-void 
-exit_special (void)
-{
-  thread_current()->exit_status = -1;
-  thread_exit ();
-}
 
 void
 syscall_init (void) 
@@ -75,32 +68,31 @@ get_user (const uint8_t *uaddr)
   asm ("movl $1f, %0; movzbl %1, %0; 1:" : "=&a" (result) : "m" (*uaddr));
   return result;
 }
-/* New method to check the address and pages to pass test sc-bad-boundary2, execute */
+
 void * 
 check_ptr2(const void *vaddr)
 { 
-  /* Judge address */
   if (!is_user_vaddr(vaddr))
   {
-    exit_special ();
-  }
-  /* Judge the page */
-  void *ptr = pagedir_get_page (thread_current()->pagedir, vaddr);
-  if (!ptr)
-  {
-    exit_special ();
-  }
-  /* Judge the content of page */
-  uint8_t *check_byteptr = (uint8_t *) vaddr;
-  for (uint8_t i = 0; i < 4; i++) 
-  {
-    if (get_user(check_byteptr + i) == -1)
-    {
-      exit_special ();
-    }
+    thread_current()->exit_status = -1;
+    thread_exit ();
   }
 
-  return ptr;
+  if (!(pagedir_get_page (thread_current()->pagedir, vaddr)))
+  {
+      thread_current()->exit_status = -1;
+      thread_exit ();
+  }
+
+  for (uint8_t i = 0; i < 4; i++) 
+  {
+    if (get_user((uint8_t *) vaddr + i) == -1)
+    {
+        thread_current()->exit_status = -1;
+        thread_exit ();
+    }
+  }
+  return (pagedir_get_page (thread_current()->pagedir, vaddr));
 }
 
 static void
@@ -111,7 +103,8 @@ syscall_handler (struct intr_frame *f UNUSED)
   check_ptr2 (p + 1);
   int type = * (int *)f->esp;
   if(type <= 0 || type >= max_syscall){
-    exit_special ();
+      thread_current()->exit_status = -1;
+      thread_exit ();
   }
   syscalls[type](f);
 }
