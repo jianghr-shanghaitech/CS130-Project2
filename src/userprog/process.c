@@ -57,26 +57,6 @@ process_execute (const char *file_name)
   return tid;
 }
 
-
-void
-push_argument (void **esp, int argc, int argv[]){
-  *esp = (int)*esp & 0xfffffffc;
-  *esp -= 4;
-  *(int *) *esp = 0;
-  for (int i = argc - 1; i >= 0; i--)
-  {
-    *esp -= 4;
-    *(int *) *esp = argv[i];
-  }
-  *esp -= 4;
-  *(int *) *esp = (int) *esp + 4;
-  *esp -= 4;
-  *(int *) *esp = argc;
-  *esp -= 4;
-  *(int *) *esp = 0;
-}
-
-
 /* A thread function that loads a user process and starts it
    running. */
 static void
@@ -106,15 +86,17 @@ start_process (void *file_name_)
     /* The number of parameters can't be more than 50 in the test case */
     int argv[50];
     temp = fn_copy;
+    // parameters extract
     while(NULL != (temp = strtok_r (temp, " ", &save_ptr))){
       if_.esp -= (strlen(temp)+1);
       memcpy (if_.esp, temp, strlen(temp)+1);
       argv[argc++] = (int) if_.esp;
       temp = NULL;
     }
-    if_.esp = (int) if_.esp & 0xfffffffc;
+    if_.esp = (int) if_.esp & 0xfffffffc; // ensure esp % 4 == 0
     if_.esp -= 4;
     *(int *) if_.esp = 0;
+    // record parameter address
     for (int i = argc - 1; i >= 0; i--)
     {
       if_.esp -= 4;
@@ -126,7 +108,6 @@ start_process (void *file_name_)
     *(int *) if_.esp = argc;
     if_.esp -= 4;
     *(int *) if_.esp = 0;
-    // push_argument (&if_.esp, argc, argv);
     /* Record the exec_status of the parent thread's execute and parent_sema up parent's semaphore */
     thread_current ()->parent->execute = true;
     sema_up (&thread_current ()->parent->parent_sema);
