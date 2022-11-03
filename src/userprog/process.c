@@ -95,7 +95,7 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
 
-  char *token, *save_ptr;
+  char *temp, *save_ptr;
   file_name = strtok_r (file_name, " ", &save_ptr);
   execute = load (file_name, &if_.eip, &if_.esp);
 
@@ -105,12 +105,28 @@ start_process (void *file_name_)
     int argc = 0;
     /* The number of parameters can't be more than 50 in the test case */
     int argv[50];
-    for (token = strtok_r (fn_copy, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
-      if_.esp -= (strlen(token)+1);
-      memcpy (if_.esp, token, strlen(token)+1);
+    temp = fn_copy;
+    while(NULL != (temp = strtok_r (temp, " ", &save_ptr))){
+      if_.esp -= (strlen(temp)+1);
+      memcpy (if_.esp, temp, strlen(temp)+1);
       argv[argc++] = (int) if_.esp;
+      temp = NULL;
     }
-    push_argument (&if_.esp, argc, argv);
+    if_.esp = (int) if_.esp & 0xfffffffc;
+    if_.esp -= 4;
+    *(int *) if_.esp = 0;
+    for (int i = argc - 1; i >= 0; i--)
+    {
+      if_.esp -= 4;
+      *(int *) if_.esp = argv[i];
+    }
+    if_.esp -= 4;
+    *(int *) if_.esp = (int) if_.esp + 4;
+    if_.esp -= 4;
+    *(int *) if_.esp = argc;
+    if_.esp -= 4;
+    *(int *) if_.esp = 0;
+    // push_argument (&if_.esp, argc, argv);
     /* Record the exec_status of the parent thread's execute and parent_sema up parent's semaphore */
     thread_current ()->parent->execute = true;
     sema_up (&thread_current ()->parent->parent_sema);
