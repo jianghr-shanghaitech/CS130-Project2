@@ -56,8 +56,8 @@ process_execute (const char *file_name)
 
   return tid;
 }
-/* Our implementation for Task 1:
-  Push argument into stack, this method is used in Task 1 Argument Pushing */
+
+
 void
 push_argument (void **esp, int argc, int argv[]){
   *esp = (int)*esp & 0xfffffffc;
