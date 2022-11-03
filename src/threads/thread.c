@@ -38,10 +38,6 @@ static struct thread *initial_thread;
 
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
-
-/*Use a lock to lock process when do file operation*/
-static struct lock lock_f;
-
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
   {
@@ -76,17 +72,34 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
-void 
-acquire_lock_f ()
+void
+thread_list_init(struct thread *t)  // To init and avoid the kenel panic of the program
 {
-  lock_acquire(&lock_f);
+  list_init (&t->childs);
+  list_init (&t->files);
+  list_init (&t->files);
+  sema_init (&t->parent_sema, 0);
 }
 
-void 
-release_lock_f ()
+void
+set_t_ele(struct thread *t, int priority) // set the basic element of the thread
 {
-  lock_release(&lock_f);
+  t->execute = true;
+  t->exit_status = UINT32_MAX;
+  t->file_owned = NULL;
+  t->file_fd = 2;
+
+  t->stack = (uint8_t *) t + PGSIZE;
+  t->priority = priority;
+
+  t->magic = THREAD_MAGIC;
+  t->status = THREAD_BLOCKED;
 }
+
+void acquire_lock_f (){lock_acquire(&lock_file);}
+
+void release_lock_f (){lock_release(&lock_file);}
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -106,7 +119,7 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  lock_init(&lock_f);
+  lock_init(&lock_file);
   list_init (&ready_list);
   list_init (&all_list);
 
@@ -201,22 +214,21 @@ thread_create (const char *name, int priority,
 
   /* Allocate thread. */
   t = palloc_get_page (PAL_ZERO);
-  if (t == NULL)
-    return TID_ERROR;
+  if (t == NULL) return TID_ERROR;
 
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
-  /* Our implementation */
-  /* Initialize for the thread's child */
   t->thread_child = malloc(sizeof(struct thread));
-  t->thread_child->tid = tid;
-  sema_init (&t->thread_child->parent_sema, 0);
-  list_push_back (childs, &t->thread_child->child_elem);
-  /* Initialize the  exit status by the MAX
-      Fix Bug */
-  ini_exit_sta(t->thread_child);
+  struct thread *child = t->thread_child;
+  auto parent_sema = &child->parent_sema;
+  auto child_elem = &child->child_elem;
+  child->tid = tid;
+
+  sema_init (parent_sema, 0);
+  list_push_back (childs, child_elem);
+  ini_exit_sta(child);
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -332,26 +344,21 @@ thread_exit (void)
   prt_exit_inf(thread_name(),thread_current()->exit_status);
   /*Print the information */
 
-  /*parent_sema up the semaphore for the process*/
   thread_current ()->thread_child->store_exit = exit_status;
   sema_up (&thread_current()->thread_child->parent_sema);
-  /*Close owned files*/
+
   file_close (thread_current ()->file_owned);
 
-  /*Close all the files*/
-  /*Our implementation for fixing the BUG that the file didn't close, PASS test file*/
   struct list_elem *e;
   while(!list_empty (&thread_current()->files))
   {
     e = list_pop_front (&thread_current()->files);
     struct thread_file *f = list_entry (e, struct thread_file, file_elem);
-    lock_acquire(&lock_f);
+    lock_acquire(&lock_file);
     file_close (f->file);
-    lock_release(&lock_f);;
-    /*Remove the file in the list*/
-    list_remove (e);
-    /*Free the resource the file obtain*/
+    lock_release(&lock_file);;
     free (f);
+    list_remove (e);
   }
 
   /* Remove thread from all threads list, set our status to dying,
@@ -515,6 +522,7 @@ is_thread (struct thread *t)
 
 /* Does basic initialization of T as a blocked thread named
    NAME. */
+
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
@@ -525,28 +533,12 @@ init_thread (struct thread *t, const char *name, int priority)
   ASSERT (name != NULL);
 
   memset (t, 0, sizeof *t);
-  t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
-  t->stack = (uint8_t *) t + PGSIZE;
-  t->priority = priority;
-  t->magic = THREAD_MAGIC;
-  /* File system */
-  t->file_owned = NULL;
-  t->file_fd = 2;
   if (t==initial_thread) t->parent=NULL;
-  /* Record the parent's thread */
   else t->parent = thread_current ();
-  /* List initialization for lists */
-  list_init (&t->childs);
-  list_init (&t->files);
-  list_init (&t->files);
-  /* Semaphore initialization for lists */
-  sema_init (&t->parent_sema, 0);
-  t->execute = true;
-  /* Initialize exit status to MAX */
-  t->exit_status = UINT32_MAX;
-  
-  
+
+  thread_list_init(t);
+  set_t_ele(t,priority);
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
