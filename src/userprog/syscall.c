@@ -20,21 +20,21 @@
 static void (*syscalls[max_syscall])(struct intr_frame *);
 
 /* Our implementation for Task2: syscall halt,exec,wait and practice */
-void sys_halt(struct intr_frame* f); /* syscall halt. */
-void sys_exit(struct intr_frame* f); /* syscall exit. */
-void sys_exec(struct intr_frame* f); /* syscall exec. */
+void halt(); /* syscall halt. */
+void exit(int status); /* syscall exit. */
+void exec(struct intr_frame* f); /* syscall exec. */
 
 /* Our implementation for Task3: syscall create, remove, open, filesize, read, write, seek, tell, and close */
-void sys_create(struct intr_frame* f); /* syscall create */
-void sys_remove(struct intr_frame* f); /* syscall remove */
-void sys_open(struct intr_frame* f);/* syscall open */
-void sys_wait(struct intr_frame* f); /*syscall wait */
-void sys_filesize(struct intr_frame* f);/* syscall filesize */
-void sys_read(struct intr_frame* f);  /* syscall read */
-void sys_write(struct intr_frame* f); /* syscall write */
-void sys_seek(struct intr_frame* f); /* syscall seek */
-void sys_tell(struct intr_frame* f); /* syscall tell */
-void sys_close(struct intr_frame* f); /* syscall close */
+void create(struct intr_frame* f); /* syscall create */
+void remove(struct intr_frame* f); /* syscall remove */
+void open(struct intr_frame* f);/* syscall open */
+void wait(struct intr_frame* f); /*syscall wait */
+void filesize(struct intr_frame* f);/* syscall filesize */
+void read(struct intr_frame* f);  /* syscall read */
+void write(struct intr_frame* f); /* syscall write */
+void seek(struct intr_frame* f); /* syscall seek */
+void tell(struct intr_frame* f); /* syscall tell */
+void close(struct intr_frame* f); /* syscall close */
 static void syscall_handler (struct intr_frame *);
 struct thread_file * find_file_id(int fd);
 
@@ -43,21 +43,6 @@ void
 syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-  /* Our implementation for Task2: initialize halt,exit,exec */
-  syscalls[SYS_HALT] = &sys_halt;
-  syscalls[SYS_EXIT] = &sys_exit;
-  syscalls[SYS_EXEC] = &sys_exec;
-  /* Our implementation for Task3: initialize create, remove, open, filesize, read, write, seek, tell, and close */
-  syscalls[SYS_WAIT] = &sys_wait;
-  syscalls[SYS_CREATE] = &sys_create;
-  syscalls[SYS_REMOVE] = &sys_remove;
-  syscalls[SYS_OPEN] = &sys_open;
-  syscalls[SYS_WRITE] = &sys_write;
-  syscalls[SYS_SEEK] = &sys_seek;
-  syscalls[SYS_TELL] = &sys_tell;
-  syscalls[SYS_CLOSE] =&sys_close;
-  syscalls[SYS_READ] = &sys_read;
-  syscalls[SYS_FILESIZE] = &sys_filesize;
 
 }
 
@@ -102,26 +87,24 @@ check_ptr2(const void *vaddr)
 /* Our implementation for Task2: halt,exit,exec */
 /* Do sytem halt */
 void 
-sys_halt (struct intr_frame* f)
+halt ()
 {
+  // Terminates Pintos
   shutdown_power_off();
 }
 
 /* Do sytem exit */
 void 
-sys_exit (struct intr_frame* f)
+exit (int status)
 {
-  uint32_t *user_ptr = f->esp;
-  check_ptr2 (user_ptr + 1);
-  *user_ptr++;
-  /* record the exit status of the process */
-  thread_current()->exit_status = *user_ptr;
+  thread_current()->exit_status = status;
+  // Terminates the current user program
   thread_exit ();
 }
 
 /* Do sytem exec */
 void 
-sys_exec (struct intr_frame* f)
+exec (struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
   check_ptr2 (user_ptr + 1);
@@ -132,7 +115,7 @@ sys_exec (struct intr_frame* f)
 
 /* Do sytem wait */
 void 
-sys_wait (struct intr_frame* f)
+wait (struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
   check_ptr2 (user_ptr + 1);
@@ -144,7 +127,7 @@ sys_wait (struct intr_frame* f)
 
 /* Do sytem create, we need to acquire lock for file operation in the following methods when do file operation */
 void 
-sys_create(struct intr_frame* f)
+create(struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
   check_ptr2 (user_ptr + 5);
@@ -157,7 +140,7 @@ sys_create(struct intr_frame* f)
 
 /* Do system remove, by calling the method filesys_remove */
 void 
-sys_remove(struct intr_frame* f)
+remove(struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
   check_ptr2 (user_ptr + 1);
@@ -170,7 +153,7 @@ sys_remove(struct intr_frame* f)
 
 /* Do system open, open file by the function filesys_open */
 void 
-sys_open (struct intr_frame* f)
+open (struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
   check_ptr2 (user_ptr + 1);
@@ -195,7 +178,7 @@ sys_open (struct intr_frame* f)
 }
 /* Do system write, Do writing in stdout and write in files */
 void 
-sys_write (struct intr_frame* f)
+write (struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
   check_ptr2 (user_ptr + 7);
@@ -227,7 +210,7 @@ sys_write (struct intr_frame* f)
 }
 /* Do system seek, by calling the function file_seek() in filesystem */
 void 
-sys_seek(struct intr_frame* f)
+seek(struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
   check_ptr2 (user_ptr + 5);
@@ -243,7 +226,7 @@ sys_seek(struct intr_frame* f)
 
 /* Do system tell, by calling the function file_tell() in filesystem */
 void 
-sys_tell (struct intr_frame* f)
+tell (struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
   check_ptr2 (user_ptr + 1);
@@ -261,7 +244,7 @@ sys_tell (struct intr_frame* f)
 
 /* Do system close, by calling the function file_close() in filesystem */
 void 
-sys_close (struct intr_frame* f)
+close (struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
   check_ptr2 (user_ptr + 1);
@@ -280,7 +263,7 @@ sys_close (struct intr_frame* f)
 }
 /* Do system filesize, by calling the function file_length() in filesystem */
 void 
-sys_filesize (struct intr_frame* f){
+filesize (struct intr_frame* f){
   uint32_t *user_ptr = f->esp;
   check_ptr2 (user_ptr + 1);
   *user_ptr++;
@@ -313,7 +296,7 @@ is_valid_pointer (void* esp,uint8_t argc){
 
 /* Do system read, by calling the function file_tell() in filesystem */
 void 
-sys_read (struct intr_frame* f)
+read (struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
   /* PASS the test bad read */
@@ -379,9 +362,31 @@ syscall_handler (struct intr_frame *f UNUSED)
   /* For Task2 practice, just add 1 to its first argument, and print its result */
   int * p = f->esp;
   check_ptr2 (p + 1);
-  int type = * (int *)f->esp;
-  if(type <= 0 || type >= max_syscall){
-    exit_special ();
+  switch(*(int *)f->esp){
+    case SYS_HALT:
+      halt();
+      break;
+    case SYS_EXIT:
+      exit(f->esp + 1);
+      break;
+    case SYS_EXEC:
+    case SYS_WAIT:
+    case SYS_CREATE:
+    case SYS_REMOVE:
+    case SYS_OPEN:
+    case SYS_FILESIZE:
+    case SYS_READ:
+    case SYS_WRITE:
+    case SYS_SEEK:
+    case SYS_TELL:
+    case SYS_CLOSE:
+    default:
+      exit_special ();
+      break;
   }
-  syscalls[type](f);
+  // int type = * (int *)f->esp;
+  // if(type <= 0 || type >= max_syscall){
+  //   exit_special ();
+  // }
+  // syscalls[type](f);
 }
