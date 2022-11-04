@@ -14,10 +14,8 @@
 #include "pagedir.h"
 #include <threads/vaddr.h>
 #include <filesys/filesys.h>
-# define max_syscall 20
 # define USER_VADDR_BOUND (void*) 0x08048000
-/* Our implementation for storing the array of system calls for Task2 and Task3 */
-static void (*syscalls[max_syscall])(struct intr_frame *);
+static void (*syscalls[15])(struct intr_frame *);
 
 /* Our implementation for Task2: syscall halt,exec,wait and practice */
 void halt(); /* syscall halt. */
@@ -46,7 +44,6 @@ syscall_init (void)
 
 }
 
-/* Method in document to handle special situation */
 static int 
 get_user (const uint8_t *uaddr)
 {
@@ -55,37 +52,28 @@ get_user (const uint8_t *uaddr)
   return result;
 }
 
-/* New method to check the address and pages to pass test sc-bad-boundary2, execute */
-void * 
-check_ptr2(const void *vaddr)
+void * ptr2(const void *vaddr)
 { 
-  /* Judge address */
-  if (!is_user_vaddr(vaddr))
+  if (!is_user_vaddr(vaddr) || (!pagedir_get_page (thread_current()->pagedir, vaddr)))
   {
-    exit_special ();
+    thread_current()->exit_status = -1;
+    thread_exit ();
   }
-  /* Judge the page */
-  void *ptr = pagedir_get_page (thread_current()->pagedir, vaddr);
-  if (!ptr)
-  {
-    exit_special ();
-  }
-  /* Judge the content of page */
   uint8_t *check_byteptr = (uint8_t *) vaddr;
-  for (uint8_t i = 0; i < 4; i++) 
+  uint8_t i = 0;
+  while (i < 4) 
   {
     if (get_user(check_byteptr + i) == -1)
     {
-      exit_special ();
+      thread_current()->exit_status = -1;
+      thread_exit ();
     }
+    i++;
   }
-
-  return ptr;
+  return pagedir_get_page (thread_current()->pagedir, vaddr);
 }
 
 
-/* Our implementation for Task2: halt,exit,exec */
-/* Do sytem halt */
 void 
 halt ()
 {
@@ -93,7 +81,6 @@ halt ()
   shutdown_power_off();
 }
 
-/* Do sytem exit */
 void 
 exit (int status)
 {
@@ -107,8 +94,8 @@ void
 exec (struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
-  check_ptr2 (user_ptr + 1);
-  check_ptr2 (*(user_ptr + 1));
+  ptr2 (user_ptr + 1);
+  ptr2 (*(user_ptr + 1));
   *user_ptr++;
   f->eax = process_execute((char*)* user_ptr);
 }
@@ -118,7 +105,7 @@ void
 wait (struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
-  check_ptr2 (user_ptr + 1);
+  ptr2 (user_ptr + 1);
   *user_ptr++;
   f->eax = process_wait(*user_ptr);
 }
@@ -130,8 +117,8 @@ void
 create(struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
-  check_ptr2 (user_ptr + 5);
-  check_ptr2 (*(user_ptr + 4));
+  ptr2 (user_ptr + 5);
+  ptr2 (*(user_ptr + 4));
   *user_ptr++;
   acquire_lock_f ();
   f->eax = filesys_create ((const char *)*user_ptr, *(user_ptr+1));
@@ -143,8 +130,8 @@ void
 remove(struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
-  check_ptr2 (user_ptr + 1);
-  check_ptr2 (*(user_ptr + 1));
+  ptr2 (user_ptr + 1);
+  ptr2 (*(user_ptr + 1));
   *user_ptr++;
   acquire_lock_f ();
   f->eax = filesys_remove ((const char *)*user_ptr);
@@ -156,8 +143,8 @@ void
 open (struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
-  check_ptr2 (user_ptr + 1);
-  check_ptr2 (*(user_ptr + 1));
+  ptr2 (user_ptr + 1);
+  ptr2 (*(user_ptr + 1));
   *user_ptr++;
   acquire_lock_f ();
   struct file * file_opened = filesys_open((const char *)*user_ptr);
@@ -181,8 +168,8 @@ void
 write (struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
-  check_ptr2 (user_ptr + 7);
-  check_ptr2 (*(user_ptr + 6));
+  ptr2 (user_ptr + 7);
+  ptr2 (*(user_ptr + 6));
   *user_ptr++;
   int temp2 = *user_ptr;
   const char * buffer = (const char *)*(user_ptr+1);
@@ -213,7 +200,7 @@ void
 seek(struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
-  check_ptr2 (user_ptr + 5);
+  ptr2 (user_ptr + 5);
   *user_ptr++;
   struct thread_file *file_temp = find_file_id (*user_ptr);
   if (file_temp)
@@ -229,7 +216,7 @@ void
 tell (struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
-  check_ptr2 (user_ptr + 1);
+  ptr2 (user_ptr + 1);
   *user_ptr++;
   struct thread_file *thread_file_temp = find_file_id (*user_ptr);
   if (thread_file_temp)
@@ -247,7 +234,7 @@ void
 close (struct intr_frame* f)
 {
   uint32_t *user_ptr = f->esp;
-  check_ptr2 (user_ptr + 1);
+  ptr2 (user_ptr + 1);
   *user_ptr++;
   struct thread_file * opened_file = find_file_id (*user_ptr);
   if (opened_file)
@@ -265,7 +252,7 @@ close (struct intr_frame* f)
 void 
 filesize (struct intr_frame* f){
   uint32_t *user_ptr = f->esp;
-  check_ptr2 (user_ptr + 1);
+  ptr2 (user_ptr + 1);
   *user_ptr++;
   struct thread_file * thread_file_temp = find_file_id (*user_ptr);
   if (thread_file_temp)
@@ -307,7 +294,8 @@ read (struct intr_frame* f)
   uint8_t * buffer = (uint8_t*)*(user_ptr+1);
   off_t size = *(user_ptr+2);
   if (!is_valid_pointer (buffer, 1) || !is_valid_pointer (buffer + size,1)){
-    exit_special ();
+      thread_current()->exit_status = -1;
+  thread_exit ();
   }
   /* get the files buffer */
   if (fd == 0) 
@@ -330,14 +318,6 @@ read (struct intr_frame* f)
       f->eax = -1;
     }
   }
-}
-
-/* Handle the special situation for thread */
-void 
-exit_special (void)
-{
-  thread_current()->exit_status = -1;
-  thread_exit ();
 }
 
 /* Find file by the file's ID */
